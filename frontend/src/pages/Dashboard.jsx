@@ -1,42 +1,30 @@
 import { useEffect, useState } from "react";
+import { useSelector } from "react-redux";
 import api from "../api/client.js";
 import UploadBox from "../components/UploadBox.jsx";
 import DocumentCard from "../components/DocumentCard.jsx";
 
-// TEMP: hardcoded user until Stage 2 (Firebase Auth + JWT) is added
-const TEMP_USER_ID_KEY = "devdocs_temp_user_id";
-
 export default function Dashboard() {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState(null);
+  const { currentUser } = useSelector((state) => state.user);
 
   useEffect(() => {
-    initTempUser();
-  }, []);
-
-  useEffect(() => {
-    if (userId) fetchDocuments();
-  }, [userId]);
-
-  async function initTempUser() {
-    let id = localStorage.getItem(TEMP_USER_ID_KEY);
-    if (!id) {
-      const res = await api.post("/users", {
-        name: "Test User",
-        email: `testuser-${Date.now()}@example.com`,
-      });
-      id = res.data._id;
-      localStorage.setItem(TEMP_USER_ID_KEY, id);
+    if (currentUser) {
+      fetchDocuments();
     }
-    setUserId(id);
-  }
+  }, [currentUser]);
 
   async function fetchDocuments() {
     setLoading(true);
-    const res = await api.get("/documents");
-    setDocuments(res.data);
-    setLoading(false);
+    try {
+      const res = await api.get("/documents");
+      setDocuments(res.data);
+    } catch (err) {
+      console.error("Failed to fetch documents:", err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function handleUploaded(newDoc) {
@@ -49,7 +37,7 @@ export default function Dashboard() {
       <p className="text-gray-500 mb-6">Upload documents and (soon) ask questions about them.</p>
 
       <div className="mb-8">
-        {userId && <UploadBox userId={userId} onUploaded={handleUploaded} />}
+        {currentUser && <UploadBox userId={currentUser.id} onUploaded={handleUploaded} />}
       </div>
 
       <h2 className="text-lg font-medium text-gray-700 mb-3">Your documents</h2>

@@ -7,11 +7,8 @@ export async function uploadDocument(req, res) {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    // TEMP: hardcoded until Stage 2 auth middleware attaches req.user
-    const uploadedBy = req.body.userId;
-    if (!uploadedBy) {
-      return res.status(400).json({ error: "userId is required (temporary, until auth is added)" });
-    }
+    // Read the user ID from the JWT auth payload (attached by verifyToken)
+    const uploadedBy = req.user.id;
 
     const doc = await Document.create({
       title: req.body.title || req.file.originalname,
@@ -30,9 +27,10 @@ export async function uploadDocument(req, res) {
 }
 
 // GET /api/documents
+// Only return documents uploaded by the authenticated user
 export async function listDocuments(req, res) {
   try {
-    const docs = await Document.find().sort({ createdAt: -1 });
+    const docs = await Document.find({ uploadedBy: req.user.id }).sort({ createdAt: -1 });
     return res.json(docs);
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -40,9 +38,10 @@ export async function listDocuments(req, res) {
 }
 
 // GET /api/documents/:id
+// Only fetch if the document belongs to the authenticated user
 export async function getDocument(req, res) {
   try {
-    const doc = await Document.findById(req.params.id);
+    const doc = await Document.findOne({ _id: req.params.id, uploadedBy: req.user.id });
     if (!doc) return res.status(404).json({ error: "Document not found" });
     return res.json(doc);
   } catch (err) {
@@ -51,9 +50,10 @@ export async function getDocument(req, res) {
 }
 
 // DELETE /api/documents/:id
+// Only delete if the document belongs to the authenticated user
 export async function deleteDocument(req, res) {
   try {
-    const doc = await Document.findByIdAndDelete(req.params.id);
+    const doc = await Document.findOneAndDelete({ _id: req.params.id, uploadedBy: req.user.id });
     if (!doc) return res.status(404).json({ error: "Document not found" });
     return res.json({ message: "Document deleted" });
   } catch (err) {

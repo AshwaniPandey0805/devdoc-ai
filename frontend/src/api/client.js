@@ -1,9 +1,8 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:5000/api",
+  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api",
+  withCredentials: true, // Enables cookie transmission across origins
 });
-
-// Stage 2 will add: request interceptor to attach JWT from auth context
 
 export default api;
