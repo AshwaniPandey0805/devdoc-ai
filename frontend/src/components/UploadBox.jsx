@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import api from "../api/client.js";
 
-export default function UploadBox({ userId, onUploaded }) {
+export default function UploadBox({ onUploaded }) {
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -15,7 +15,6 @@ export default function UploadBox({ userId, onUploaded }) {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("title", file.name);
-    formData.append("userId", userId); // temporary until Stage 2 auth
 
     try {
       const res = await api.post("/documents/upload", formData, {

@@ -81,9 +81,6 @@ export async function signin(req, res) {
     }
 
     // Sign JWT
-    console.log(process.env.JWT_SECRET);
-    console.log("user_id : ", user._id);
-
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "1d",
     });

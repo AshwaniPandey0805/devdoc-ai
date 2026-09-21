@@ -37,7 +37,7 @@ export default function Dashboard() {
       <p className="text-gray-500 mb-6">Upload documents and (soon) ask questions about them.</p>
 
       <div className="mb-8">
-        {currentUser && <UploadBox userId={currentUser.id} onUploaded={handleUploaded} />}
+        {currentUser && <UploadBox onUploaded={handleUploaded} />}
       </div>
 
       <h2 className="text-lg font-medium text-gray-700 mb-3">Your documents</h2>
