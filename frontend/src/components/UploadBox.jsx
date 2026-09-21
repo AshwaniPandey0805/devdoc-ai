@@ -49,12 +49,14 @@ export default function UploadBox({ onUploaded }) {
         <p className="text-gray-600">
           {uploading ? "Uploading..." : "Drag and drop a file here, or click to browse"}
         </p>
-        <p className="text-sm text-gray-400 mt-1">PDF, TXT, Markdown — up to 20MB</p>
+        <p className="text-sm text-gray-400 mt-1">
+          PDF, Word, Excel, CSV, TXT, Markdown — up to 20MB
+        </p>
         <input
           ref={inputRef}
           type="file"
           className="hidden"
-          accept=".pdf,.txt,.md"
+          accept=".pdf,.txt,.md,.markdown,.csv,.xlsx,.xls,.docx,.doc"
           onChange={(e) => handleFile(e.target.files?.[0])}
         />
       </div>

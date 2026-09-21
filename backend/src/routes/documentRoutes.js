@@ -1,3 +1,4 @@
+import multer from "multer";
 import express from "express";
 import { upload } from "../middleware/upload.js";
 import { verifyToken } from "../middleware/auth.js";
@@ -13,7 +14,23 @@ const router = express.Router();
 // Apply authentication middleware to all document routes
 router.use(verifyToken);
 
-router.post("/upload", upload.single("file"), uploadDocument);
+router.post(
+  "/upload",
+  (req, res, next) => {
+    upload.single("file")(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        if (err.code === "LIMIT_FILE_SIZE") {
+          return res.status(400).json({ error: "File size exceeds the 20MB limit" });
+        }
+        return res.status(400).json({ error: err.message });
+      } else if (err) {
+        return res.status(400).json({ error: err.message });
+      }
+      next();
+    });
+  },
+  uploadDocument
+);
 router.get("/", listDocuments);
 router.get("/:id", getDocument);
 router.delete("/:id", deleteDocument);

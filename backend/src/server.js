@@ -40,8 +40,9 @@ app.use((req, res) => {
 
 // --- Global error handler ---
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: "Something went wrong" });
+  console.error(err.stack || err);
+  const status = err.status || (err.name === "MulterError" ? 400 : 500);
+  res.status(status).json({ error: err.message || "Something went wrong" });
 });
 
 const PORT = process.env.PORT || 5000;
