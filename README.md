@@ -13,7 +13,7 @@ The platform features end-to-end **TypeScript** type safety across both frontend
 
 ---
 
-## 🚀 Current Project Status: Stage 2 (TypeScript & Authentication Complete)
+## 🚀 Current Project Status: Stage 3 & 3.5 (Parsing Layer & AWS S3 Storage Complete)
 
 - [x] **End-to-End TypeScript Migration**: 100% strongly typed React (`.tsx`) and Express API (`.ts`).
 - [x] **Dual-Mode Authentication**:
@@ -22,11 +22,20 @@ The platform features end-to-end **TypeScript** type safety across both frontend
   - HTTP-only, secure, `SameSite` JWT session cookies (immune to client-side XSS token theft).
 - [x] **Client State Persistence**: Redux Toolkit store with `redux-persist` preserving login sessions.
 - [x] **Protected Navigation**: Declarative `PrivateRoute` and `PublicOnlyRoute` route guards.
-- [x] **Multi-Format Ingestion**:
-  - Ingests **PDF**, **Word** (`.docx`, `.doc`), **Spreadsheets** (`.xlsx`, `.xls`, `.csv`), **JSON** (`.json`, `.jsonl`), and **Plain Text/Markdown** (`.txt`, `.md`, `.markdown`) up to 20MB.
-  - User isolation: Users strictly manage and query their own documents.
-  - Disk cleanup: Deleting a document removes both the MongoDB record and the physical file on disk.
-- [ ] **Next (Stage 3)**: Extensible Data Parsing Layer (Smart PDF sanitization, Markdown-preserving DOCX processing, Row-as-Document tabular serialization, and schema-agnostic JSON ingestion). See [IMPLEMENTATION.md](./IMPLEMENTATION.md).
+- [x] **Multi-Format Document Parsing Layer (Stage 3)**:
+  - Smart PDF sanitization (ligature decoding `ﬁ` $\rightarrow$ `fi`, hyphen reconnection `atten-\ntion`, blank divider filtering).
+  - Word (`.docx`, `.doc`) structural Markdown conversion via `mammoth`.
+  - Tabular Row-as-Document serializer for multi-sheet Excel (`.xlsx`, `.xls`) and CSV with metadata hoisting.
+  - Schema-agnostic recursive JSON & streaming `.jsonl` ingestion.
+  - Normalized plain text & markdown cleaner.
+  - Automated status tracking (`uploaded` $\rightarrow$ `extracting` $\rightarrow$ `ready` or `failed`).
+- [x] **AWS S3 Cloud Storage Integration (Stage 3.5)**:
+  - Enterprise cloud file storage with modular AWS SDK v3.
+  - Multi-tenant tenant-isolated key hierarchy: `users/{userId}/documents/{timestamp}-{filename}`.
+  - Cryptographically signed presigned download/preview URLs via `@aws-sdk/s3-request-presigner`.
+  - Zero-downtime local disk fallback (`uploads/`) when AWS credentials are not set.
+  - Temporary scratch-file streaming for parsers with automated cleanup on completion.
+- [ ] **Next (Stage 4)**: Token-aware chunking (`@langchain/textsplitters`) and dense vector embeddings generation.
 
 ---
 
@@ -48,7 +57,8 @@ The platform features end-to-end **TypeScript** type safety across both frontend
 * **Database & ODM**: MongoDB with Mongoose 8
 * **Security & Auth**: `jsonwebtoken`, `bcryptjs`, `cookie-parser`, `cors`
 * **Cloud & Admin**: `firebase-admin` (OAuth token verification)
-* **File Processing**: Multer (disk storage with MIME/extension whitelist)
+* **Cloud Storage**: AWS S3 (`@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`, `@aws-sdk/lib-storage`) with local disk fallback
+* **Parsers & Ingestion**: `@langchain/core`, `@langchain/community`, `pdf-parse`, `mammoth`, `xlsx`, `d3-dsv`
 
 ---
 
@@ -99,7 +109,7 @@ AI-Document-QA-Platform/
     │   │   └── firebaseAdmin.ts    # Firebase Admin SDK initialization
     │   ├── controllers/
     │   │   ├── authController.ts   # Signup, signin, Google OAuth, signout
-    │   │   ├── documentController.ts# Upload, list, get, and delete documents
+    │   │   ├── documentController.ts# Upload, list, get, view URLs, delete
     │   │   └── userController.ts   # User management handlers
     │   ├── middleware/
     │   │   ├── auth.ts             # verifyToken JWT cookie validator
@@ -111,6 +121,21 @@ AI-Document-QA-Platform/
     │   │   ├── authRoutes.ts       # /api/auth routes
     │   │   ├── documentRoutes.ts   # /api/documents routes (protected)
     │   │   └── userRoutes.ts       # /api/users routes
+    │   ├── services/
+    │   │   ├── documentProcessor.ts# Background extraction orchestrator
+    │   │   ├── parsers/            # Multi-format document parser strategies
+    │   │   │   ├── BaseParser.ts
+    │   │   │   ├── ParserFactory.ts
+    │   │   │   ├── SmartPdfParser.ts
+    │   │   │   ├── MarkdownDocxParser.ts
+    │   │   │   ├── TabularDataParser.ts
+    │   │   │   ├── JsonDataParser.ts
+    │   │   │   └── PlainTextParser.ts
+    │   │   └── storage/            # Cloud & local storage abstraction
+    │   │       ├── IStorageService.ts
+    │   │       ├── S3StorageService.ts
+    │   │       ├── LocalStorageService.ts
+    │   │       └── StorageFactory.ts
     │   ├── types/
     │   │   └── express.d.ts        # Request augmentation (req.user)
     │   └── server.ts               # Express entry point
@@ -158,6 +183,12 @@ JWT_SECRET=your_super_secret_jwt_key_here
 FIREBASE_PROJECT_ID=your-project-id
 # Single-line JSON service account:
 FIREBASE_SERVICE_ACCOUNT=
+
+# AWS S3 Cloud Storage (Stage 3.5 - Optional; defaults to local uploads/ if unset)
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your_aws_access_key_id
+AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
+AWS_S3_BUCKET=devdocs-ai-storage
 ```
 
 Start the backend in development mode:
@@ -226,25 +257,34 @@ npm run build
 | `POST` | `/api/auth/signin` | No | Authenticate user and receive HTTP-only JWT cookie |
 | `POST` | `/api/auth/google` | No | Verify Firebase Google ID token and issue JWT session |
 | `POST` | `/api/auth/signout`| Yes | Clears session cookie |
-| `POST` | `/api/documents/upload` | **Yes** | Upload document (`multipart/form-data`) up to 20MB |
+| `POST` | `/api/documents/upload` | **Yes** | Upload document (`multipart/form-data`) up to 20MB to S3 or local disk |
 | `GET` | `/api/documents` | **Yes** | Fetch all documents uploaded by authenticated user |
-| `GET` | `/api/documents/:id` | **Yes** | Fetch single document metadata (user-scoped) |
-| `DELETE`| `/api/documents/:id` | **Yes** | Delete document from MongoDB and local storage |
+| `GET` | `/api/documents/:id` | **Yes** | Fetch single document metadata and extracted content (user-scoped) |
+| `GET` | `/api/documents/:id/download-url` | **Yes** | Generate time-limited presigned S3 URL or local streaming link |
+| `GET` | `/api/documents/:id/file` | **Yes** | Stream document binary directly with appropriate MIME headers |
+| `DELETE`| `/api/documents/:id` | **Yes** | Delete document from MongoDB and physical storage (S3 or local) |
 
 ---
 
 ## 🗺️ Roadmap & Next Stages
 
-* **Stage 3: Data Parsing Layer**:
-  * Multi-format Strategy & Factory Pattern (`BaseParser`, `ParserFactory`).
+* [x] **Stage 1: TypeScript Migration & Codebase Hardening** (100% Complete)
+* [x] **Stage 2: Dual Authentication & User Isolation** (100% Complete)
+* [x] **Stage 3: Multi-Format Data Parsing Layer** (100% Complete)
+  * Strategy & Factory Pattern (`BaseParser`, `ParserFactory`).
   * `SmartPdfParser`: Ligature cleaning, hyphen repair, and page-level metadata.
   * `MarkdownDocxParser`: Preserving heading hierarchies (`#`, `##`) and tables.
   * `TabularDataParser`: Row-as-Document serialization with metadata hoisting for CSV/Excel.
   * `JsonDataParser`: Schema-agnostic nested entity flattener and streaming `.jsonl`.
-  * Asynchronous processing queue via Redis & BullMQ.
-* **Stage 4: Chunking & Embeddings**:
-  * Token-aware recursive text splitting (`@langchain/textsplitters` + `js-tiktoken`).
-  * OpenAI / Google Gemini Embedding generation.
-* **Stage 5: Vector Search & Interactive Q&A Chat**:
+* [x] **Stage 3.5: AWS S3 Cloud Storage Integration** (100% Complete)
+  * Zero-downtime unified storage abstraction (`IStorageService`).
+  * Modular AWS SDK v3 client with IAM least-privilege support.
+  * Tenant-isolated object keys (`users/{userId}/documents/{timestamp}-{filename}`).
+  * Cryptographically signed presigned URLs for secure client previews.
+  * Automatic local disk fallback when AWS credentials are not configured.
+* [ ] **Stage 4: Token-Aware Chunking & Dense Embeddings** (Next)
+  * Recursive text splitting via `@langchain/textsplitters` with chunk overlap.
+  * Embedding generation (OpenAI `text-embedding-3-small` / Gemini Embedding).
+* [ ] **Stage 5: Vector Database & Interactive RAG Chat**
   * Vector Database indexing (Pinecone / Qdrant / Chroma).
-  * Streaming conversational RAG interface with source citation badges.
+  * Streaming conversational RAG interface with citation cards.

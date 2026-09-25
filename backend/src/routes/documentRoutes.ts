@@ -6,6 +6,8 @@ import {
   uploadDocument,
   listDocuments,
   getDocument,
+  getDocumentDownloadUrl,
+  streamDocumentFile,
   deleteDocument,
 } from "../controllers/documentController.js";
 
@@ -35,6 +37,8 @@ router.post(
   uploadDocument
 );
 router.get("/", listDocuments);
+router.get("/:id/download-url", getDocumentDownloadUrl);
+router.get("/:id/file", streamDocumentFile);
 router.get("/:id", getDocument);
 router.delete("/:id", deleteDocument);
 

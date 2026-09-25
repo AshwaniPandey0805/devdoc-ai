@@ -21,6 +21,7 @@ export interface DocumentItem {
   title: string;
   originalFileName: string;
   storagePath: string;
+  storageType?: "s3" | "local";
   mimeType: string;
   sizeBytes: number;
   uploadedBy: string;

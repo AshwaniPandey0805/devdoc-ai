@@ -11,7 +11,12 @@ export const verifyToken = (
   res: Response,
   next: NextFunction
 ): void => {
-  const token = req.cookies?.access_token;
+  const token =
+    req.cookies?.access_token ||
+    (typeof req.query?.token === "string" ? req.query.token : undefined) ||
+    (req.headers.authorization?.startsWith("Bearer ")
+      ? req.headers.authorization.split(" ")[1]
+      : undefined);
 
   if (!token) {
     res.status(401).json({ error: "Unauthorized: Access token missing" });

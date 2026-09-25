@@ -8,6 +8,8 @@ export type DocumentStatus =
   | "ready"
   | "failed";
 
+export type StorageType = "s3" | "local";
+
 export interface IParsedItem {
   pageContent: string;
   metadata: Record<string, any>;
@@ -16,7 +18,10 @@ export interface IParsedItem {
 export interface IDocument extends MongooseDocument {
   title: string;
   originalFileName: string;
-  storagePath: string;
+  storagePath: string;                // S3 Object Key or local path
+  storageType: StorageType;           // "s3" or "local"
+  s3Bucket?: string;
+  s3Region?: string;
   mimeType: string;
   sizeBytes: number;
   uploadedBy: Types.ObjectId;
@@ -46,6 +51,9 @@ const documentSchema = new mongoose.Schema<IDocument>(
     title: { type: String, required: true, trim: true },
     originalFileName: { type: String, required: true },
     storagePath: { type: String, required: true },
+    storageType: { type: String, enum: ["s3", "local"], default: "local" },
+    s3Bucket: { type: String },
+    s3Region: { type: String },
     mimeType: { type: String, required: true },
     sizeBytes: { type: Number, required: true },
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
