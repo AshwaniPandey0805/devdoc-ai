@@ -13,7 +13,7 @@ The platform features end-to-end **TypeScript** type safety across both frontend
 
 ---
 
-## 🚀 Current Project Status: Stage 3 & 3.5 (Parsing Layer & AWS S3 Storage Complete)
+## 🚀 Current Project Status: Stage 4 (Token-Aware Chunking & OpenAI Vector Embeddings Complete)
 
 - [x] **End-to-End TypeScript Migration**: 100% strongly typed React (`.tsx`) and Express API (`.ts`).
 - [x] **Dual-Mode Authentication**:
@@ -35,7 +35,15 @@ The platform features end-to-end **TypeScript** type safety across both frontend
   - Cryptographically signed presigned download/preview URLs via `@aws-sdk/s3-request-presigner`.
   - Zero-downtime local disk fallback (`uploads/`) when AWS credentials are not set.
   - Temporary scratch-file streaming for parsers with automated cleanup on completion.
-- [ ] **Next (Stage 4)**: Token-aware chunking (`@langchain/textsplitters`) and dense vector embeddings generation.
+- [x] **Token-Aware Chunking & OpenAI Vector Embeddings (Stage 4)**:
+  - Multi-format token splitting via `ChunkingService` using `@langchain/textsplitters` (`RecursiveCharacterTextSplitter`).
+  - Preserves row-as-document semantic boundaries for spreadsheets (CSV/Excel) and header hierarchies for Markdown/DOCX.
+  - Integrated OpenAI Embeddings (`@langchain/openai`) supporting `text-embedding-3-small` (1,536 dimensions) and `text-embedding-3-large`.
+  - Native Matryoshka Representation Learning (MRL) dimension shortening (e.g. 1536 $\rightarrow$ 512 dimensions) saving 66% vector storage.
+  - 100% offline, zero-cost ONNX local fallback via Hugging Face (`Xenova/all-MiniLM-L6-v2`) when API keys are absent.
+  - Pure TypeScript vector math library (`cosineSimilarity`, `dotProduct`, `euclideanDistance`).
+  - Async lifecycle handshake: transitions from `extracting` $\rightarrow$ `embedding` and records `embeddingStats`.
+- [ ] **Next (Stage 5)**: Vector Database Storage (MongoDB Chunk Schema / Atlas Vector Search / Pinecone) & Interactive RAG Chat.
 
 ---
 
@@ -59,6 +67,9 @@ The platform features end-to-end **TypeScript** type safety across both frontend
 * **Cloud & Admin**: `firebase-admin` (OAuth token verification)
 * **Cloud Storage**: AWS S3 (`@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`, `@aws-sdk/lib-storage`) with local disk fallback
 * **Parsers & Ingestion**: `@langchain/core`, `@langchain/community`, `pdf-parse`, `mammoth`, `xlsx`, `d3-dsv`
+* **Chunking**: `@langchain/textsplitters` (`RecursiveCharacterTextSplitter`)
+* **Vector Embeddings**: `@langchain/openai` (`text-embedding-3-small`, MRL dimension reduction)
+* **Offline Fallback**: `@huggingface/transformers` (local ONNX `Xenova/all-MiniLM-L6-v2`)
 
 ---
 
@@ -122,7 +133,17 @@ AI-Document-QA-Platform/
     │   │   ├── documentRoutes.ts   # /api/documents routes (protected)
     │   │   └── userRoutes.ts       # /api/users routes
     │   ├── services/
-    │   │   ├── documentProcessor.ts# Background extraction orchestrator
+    │   │   ├── documentProcessor.ts# Background extraction & embedding orchestrator
+    │   │   ├── chunking/           # Token-aware recursive text splitting
+    │   │   │   ├── ChunkingService.ts
+    │   │   │   └── index.ts
+    │   │   ├── embeddings/         # Vector embeddings & local fallback
+    │   │   │   ├── IEmbeddingService.ts
+    │   │   │   ├── OpenAIEmbeddingService.ts
+    │   │   │   ├── HuggingFaceEmbeddingService.ts
+    │   │   │   ├── EmbeddingFactory.ts
+    │   │   │   ├── vectorMath.ts
+    │   │   │   └── index.ts
     │   │   ├── parsers/            # Multi-format document parser strategies
     │   │   │   ├── BaseParser.ts
     │   │   │   ├── ParserFactory.ts
@@ -136,6 +157,8 @@ AI-Document-QA-Platform/
     │   │       ├── S3StorageService.ts
     │   │       ├── LocalStorageService.ts
     │   │       └── StorageFactory.ts
+    │   ├── scripts/
+    │   │   └── test-embeddings.ts  # Verification runner for chunking & embeddings
     │   ├── types/
     │   │   └── express.d.ts        # Request augmentation (req.user)
     │   └── server.ts               # Express entry point
@@ -189,6 +212,12 @@ AWS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=your_aws_access_key_id
 AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
 AWS_S3_BUCKET=devdocs-ai-storage
+
+# Vector Embeddings (Stage 4 - OpenAI text-embedding-3 / Hugging Face local fallback)
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+# Optional: Matryoshka Representation Learning dimension reduction (e.g. 512, 1536)
+OPENAI_EMBEDDING_DIMENSIONS=1536
 ```
 
 Start the backend in development mode:
@@ -232,9 +261,9 @@ Frontend will be live at **`http://localhost:5173`**.
 
 ---
 
-## 🧪 Build & Compilation Verification
+## 🧪 Build & Verification
 
-To test that both applications compile with zero TypeScript errors:
+To verify that both applications compile with zero TypeScript errors:
 
 ```bash
 # Type-check and build backend
@@ -245,6 +274,14 @@ npm run build
 cd ../frontend
 npm run build
 ```
+
+To test the chunking and vector embedding generation pipeline locally:
+
+```bash
+cd backend
+npm run test:embeddings
+```
+*(Tests format-aware chunking, batch vector generation, MRL dimension reduction, query embedding, and cosine similarity ranking).*
 
 ---
 
@@ -282,9 +319,17 @@ npm run build
   * Tenant-isolated object keys (`users/{userId}/documents/{timestamp}-{filename}`).
   * Cryptographically signed presigned URLs for secure client previews.
   * Automatic local disk fallback when AWS credentials are not configured.
-* [ ] **Stage 4: Token-Aware Chunking & Dense Embeddings** (Next)
-  * Recursive text splitting via `@langchain/textsplitters` with chunk overlap.
-  * Embedding generation (OpenAI `text-embedding-3-small` / Gemini Embedding).
-* [ ] **Stage 5: Vector Database & Interactive RAG Chat**
-  * Vector Database indexing (Pinecone / Qdrant / Chroma).
+* [x] **Stage 4: Token-Aware Chunking & OpenAI Vector Embeddings** (100% Complete)
+  * Multi-format token splitting via `ChunkingService` (`RecursiveCharacterTextSplitter`).
+  * Preserves tabular row boundaries and Markdown heading context.
+  * OpenAI Embeddings integration (`text-embedding-3-small` / `text-embedding-3-large`).
+  * Matryoshka Representation Learning (MRL) dimension shortening (e.g. 1536 $\rightarrow$ 512 dimensions).
+  * 100% offline, zero-cost ONNX local fallback via Hugging Face (`Xenova/all-MiniLM-L6-v2`).
+  * Pure TypeScript vector math library (`cosineSimilarity`, `dotProduct`, `euclideanDistance`).
+  * Asynchronous document processor integration: `"extracting"` $\rightarrow$ `"embedding"`.
+* [ ] **Stage 5: Vector Database & Interactive RAG Chat** (Next)
+  * Dedicated vector collection persistence (`models/Chunk.ts`).
+  * Atlas Vector Search / Pinecone / Qdrant indexing.
+  * Document status finalization to `"ready"` upon vector persistence.
+  * Semantic retrieval endpoint (`POST /api/documents/:id/query`).
   * Streaming conversational RAG interface with citation cards.
