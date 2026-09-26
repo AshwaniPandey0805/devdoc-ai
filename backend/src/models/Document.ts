@@ -34,6 +34,12 @@ export interface IDocument extends MongooseDocument {
     detectedFormat?: string;
   };
   extractedContent?: IParsedItem[];
+  embeddingStats?: {
+    model?: string;
+    dimensions?: number;
+    totalChunks?: number;
+    embeddedAt?: Date;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -70,6 +76,12 @@ const documentSchema = new mongoose.Schema<IDocument>(
       detectedFormat: { type: String },
     },
     extractedContent: [parsedItemSchema],
+    embeddingStats: {
+      model: { type: String },
+      dimensions: { type: Number },
+      totalChunks: { type: Number },
+      embeddedAt: { type: Date },
+    },
   },
   { timestamps: true }
 );
