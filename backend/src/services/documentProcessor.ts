@@ -5,6 +5,7 @@ import { ParserFactory } from "./parsers/index.js";
 import { StorageFactory } from "./storage/index.js";
 import { ChunkingService } from "./chunking/index.js";
 import { EmbeddingFactory } from "./embeddings/index.js";
+import { ChromaService, getCollectionNameForModel, VectorChunkRecord } from "./vectorDb/index.js";
 
 /**
  * Asynchronously processes an uploaded document:
@@ -81,8 +82,32 @@ export async function processDocument(
       `[DocumentProcessor] Successfully embedded ${vectors.length} chunk(s) using ${embeddingService.modelName} (${embeddingService.dimensions} dims).`
     );
 
-    // 8. Record embedding stats on document (retains status: "embedding" until Stage 5 Vector DB storage)
+    // 8. ChromaDB Vector Database Storage (Stage 5)
+    const collectionName = getCollectionNameForModel(
+      embeddingService.modelName,
+      embeddingService.dimensions
+    );
+    const chromaService = new ChromaService();
+
+    const records: VectorChunkRecord[] = chunks.map((chunk, i) => ({
+      id: `${docId}_chunk_${chunk.chunkIndex}`,
+      vector: vectors[i],
+      content: chunk.content,
+      metadata: {
+        ...chunk.metadata,
+        userId: doc?.uploadedBy?.toString() || "",
+        documentId: docId.toString(),
+        source: chunk.metadata?.source || doc?.originalFileName || "document",
+        chunkIndex: chunk.chunkIndex,
+      },
+    }));
+
+    await chromaService.upsertChunks(collectionName, records);
+
+    // 9. Finalize Document Status to "ready"
     await Document.findByIdAndUpdate(docId, {
+      status: "ready",
+      chromaCollection: collectionName,
       embeddingStats: {
         model: embeddingService.modelName,
         dimensions: embeddingService.dimensions,
@@ -93,7 +118,7 @@ export async function processDocument(
     });
 
     console.log(
-      `[DocumentProcessor] Document ${docId} processed and embedded (${vectors.length} vectors, ${embeddingService.dimensions} dims). Status -> embedding (Ready for Stage 5 Vector DB storage).`
+      `[DocumentProcessor] Document ${docId} fully processed, indexed in ChromaDB ('${collectionName}'), status -> ready.`
     );
   } catch (error: any) {
     console.error(`[DocumentProcessor] Extraction failed for document ${docId}:`, error.message);

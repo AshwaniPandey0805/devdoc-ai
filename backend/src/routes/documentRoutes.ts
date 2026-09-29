@@ -10,6 +10,7 @@ import {
   streamDocumentFile,
   deleteDocument,
 } from "../controllers/documentController.js";
+import { askDocumentQuestion } from "../controllers/chatController.js";
 
 const router: Router = express.Router();
 
@@ -40,6 +41,7 @@ router.get("/", listDocuments);
 router.get("/:id/download-url", getDocumentDownloadUrl);
 router.get("/:id/file", streamDocumentFile);
 router.get("/:id", getDocument);
+router.post("/:id/chat", askDocumentQuestion);
 router.delete("/:id", deleteDocument);
 
 export default router;

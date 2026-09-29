@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import Document, { IDocument } from "../models/Document.js";
 import { processDocument } from "../services/documentProcessor.js";
 import { StorageFactory } from "../services/storage/index.js";
+import { ChromaService } from "../services/vectorDb/index.js";
 
 // POST /api/documents/upload
 export async function uploadDocument(req: Request, res: Response): Promise<Response> {
@@ -174,6 +175,16 @@ export async function deleteDocument(req: Request, res: Response): Promise<Respo
         await storageService.deleteFile(doc.storagePath);
       } catch (err: any) {
         console.warn(`[DeleteDocument] Warning cleaning up ${doc.storagePath}:`, err.message);
+      }
+    }
+
+    // Cascade delete vectors from ChromaDB
+    if (doc.chromaCollection) {
+      try {
+        const chromaService = new ChromaService();
+        await chromaService.deleteByDocumentId(doc.chromaCollection, doc._id.toString());
+      } catch (chromaErr: any) {
+        console.warn(`[DeleteDocument] Warning cleaning up ChromaDB vectors:`, chromaErr.message);
       }
     }
 

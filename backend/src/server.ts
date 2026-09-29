@@ -1,14 +1,13 @@
+import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import morgan from "morgan";
-import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import { connectDB } from "./config/db.js";
 import documentRoutes from "./routes/documentRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
-
-dotenv.config();
+import chatRoutes from "./routes/chatRoutes.js";
 
 const app = express();
 
@@ -25,12 +24,13 @@ app.use(morgan("dev"));
 
 // --- Health check ---
 app.get("/api/health", (_req: Request, res: Response) => {
-  res.json({ status: "ok", stage: 2 });
+  res.json({ status: "ok", stage: 5, vectorDb: "ChromaDB" });
 });
 
 // --- Routes ---
 app.use("/api/auth", authRoutes);
 app.use("/api/documents", documentRoutes);
+app.use("/api/chat", chatRoutes);
 app.use("/api/users", userRoutes);
 
 // --- 404 handler ---

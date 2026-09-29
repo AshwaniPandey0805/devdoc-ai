@@ -13,7 +13,7 @@ The platform features end-to-end **TypeScript** type safety across both frontend
 
 ---
 
-## 🚀 Current Project Status: Stage 4 (Token-Aware Chunking & OpenAI Vector Embeddings Complete)
+## 🚀 Current Project Status: Stage 5 (ChromaDB Vector Database & Grounded OpenAI RAG Q&A Complete)
 
 - [x] **End-to-End TypeScript Migration**: 100% strongly typed React (`.tsx`) and Express API (`.ts`).
 - [x] **Dual-Mode Authentication**:
@@ -43,7 +43,16 @@ The platform features end-to-end **TypeScript** type safety across both frontend
   - 100% offline, zero-cost ONNX local fallback via Hugging Face (`Xenova/all-MiniLM-L6-v2`) when API keys are absent.
   - Pure TypeScript vector math library (`cosineSimilarity`, `dotProduct`, `euclideanDistance`).
   - Async lifecycle handshake: transitions from `extracting` $\rightarrow$ `embedding` and records `embeddingStats`.
-- [ ] **Next (Stage 5)**: Vector Database Storage (MongoDB Chunk Schema / Atlas Vector Search / Pinecone) & Interactive RAG Chat.
+- [x] **ChromaDB Vector Database & Grounded OpenAI RAG Q&A (Stage 5)**:
+  - High-performance vector database persistence via `ChromaService` (`chromadb`).
+  - Dimension-aware collection resolution (`devdocs_openai_1536`, `devdocs_huggingface_384`).
+  - Strict multi-tenant isolation with compound metadata filtering (`userId` + `documentId`).
+  - Real-time similarity retrieval with cosine distance mapping and similarity scoring.
+  - Grounded prompt orchestration engine (`QaService`) with anti-hallucination guardrails and source citations.
+  - Document status finalization to `"ready"` upon ChromaDB chunk indexing.
+  - Cascading vector deletion on document removal.
+  - Frontend interactive Chat modal (`DocumentChatModal.tsx`) with citation inspection and similarity pills.
+- [ ] **Next (Stage 6)**: Multi-document conversation threads, streaming SSE responses, and agentic query routing.
 
 ---
 
@@ -327,9 +336,15 @@ npm run test:embeddings
   * 100% offline, zero-cost ONNX local fallback via Hugging Face (`Xenova/all-MiniLM-L6-v2`).
   * Pure TypeScript vector math library (`cosineSimilarity`, `dotProduct`, `euclideanDistance`).
   * Asynchronous document processor integration: `"extracting"` $\rightarrow$ `"embedding"`.
-* [ ] **Stage 5: Vector Database & Interactive RAG Chat** (Next)
-  * Dedicated vector collection persistence (`models/Chunk.ts`).
-  * Atlas Vector Search / Pinecone / Qdrant indexing.
-  * Document status finalization to `"ready"` upon vector persistence.
-  * Semantic retrieval endpoint (`POST /api/documents/:id/query`).
-  * Streaming conversational RAG interface with citation cards.
+* [x] **Stage 5: ChromaDB Vector Database & Grounded OpenAI RAG Q&A** (100% Complete)
+  * Dimension-aware ChromaDB collection partitioning (`devdocs_openai_1536`, `devdocs_huggingface_384`).
+  * Compound tenant isolation: `userId` + `documentId` metadata filtering.
+  * Real-time vector similarity search with cosine distance calculation.
+  * Grounded OpenAI prompt orchestration (`QaService`) with anti-hallucination guardrails and citations.
+  * Automatic document lifecycle transition to `"ready"` on ChromaDB persistence.
+  * Cascading Chroma vector deletion upon document removal.
+  * Full frontend interactive chat modal with source citation drawer.
+* [ ] **Stage 6: Multi-Document Threads & Streaming Responses** (Next)
+  * Server-Sent Events (SSE) token streaming for typewriter chat responses.
+  * Multi-document conversation history persistence.
+  * Dynamic hybrid search (keyword + vector).

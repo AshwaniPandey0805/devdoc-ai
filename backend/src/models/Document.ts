@@ -40,6 +40,7 @@ export interface IDocument extends MongooseDocument {
     totalChunks?: number;
     embeddedAt?: Date;
   };
+  chromaCollection?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -82,6 +83,7 @@ const documentSchema = new mongoose.Schema<IDocument>(
       totalChunks: { type: Number },
       embeddedAt: { type: Date },
     },
+    chromaCollection: { type: String },
   },
   { timestamps: true }
 );
