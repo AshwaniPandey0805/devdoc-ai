@@ -16,10 +16,11 @@ The platform features end-to-end **TypeScript** type safety across both frontend
 ## 🚀 Current Project Status: Stage 5 (ChromaDB Vector Database & Grounded OpenAI RAG Q&A Complete)
 
 - [x] **End-to-End TypeScript Migration**: 100% strongly typed React (`.tsx`) and Express API (`.ts`).
-- [x] **Dual-Mode Authentication**:
+- [x] **Dual-Mode Authentication & Account Recovery**:
   - Secure Email/Password registration and login with `bcryptjs` hashing.
   - One-click Google OAuth via Firebase popup and backend cryptographic verification.
   - HTTP-only, secure, `SameSite` JWT session cookies (immune to client-side XSS token theft).
+  - **OWASP-Compliant Password Recovery Flow**: 256-bit cryptographic reset tokens, SHA-256 database hashing, 15-minute expiration window, single-use invalidation, anti-user enumeration protection, and dual dispatch (SMTP transporter + zero-config dev console fallback).
 - [x] **Client State Persistence**: Redux Toolkit store with `redux-persist` preserving login sessions.
 - [x] **Protected Navigation**: Declarative `PrivateRoute` and `PublicOnlyRoute` route guards.
 - [x] **Multi-Format Document Parsing Layer (Stage 3)**:
@@ -103,6 +104,8 @@ AI-Document-QA-Platform/
 │   │   │   └── UploadBox.tsx       # Drag-and-drop & file picker (up to 20MB)
 │   │   ├── pages/
 │   │   │   ├── Dashboard.tsx       # Main dashboard & user document list
+│   │   │   ├── ForgotPassword.tsx  # Password recovery request screen
+│   │   │   ├── ResetPassword.tsx   # Token validation & password reset screen
 │   │   │   ├── SignIn.tsx          # Email/Password sign-in screen
 │   │   │   └── SignUp.tsx          # User registration screen
 │   │   ├── redux/
@@ -124,53 +127,57 @@ AI-Document-QA-Platform/
 │
 └── backend/                        # Node.js + Express + TypeScript API
     ├── src/
-    │   ├── config/
-    │   │   ├── db.ts               # MongoDB Mongoose connection
-    │   │   └── firebaseAdmin.ts    # Firebase Admin SDK initialization
-    │   ├── controllers/
-    │   │   ├── authController.ts   # Signup, signin, Google OAuth, signout
-    │   │   ├── documentController.ts# Upload, list, get, view URLs, delete
-    │   │   └── userController.ts   # User management handlers
-    │   ├── middleware/
-    │   │   ├── auth.ts             # verifyToken JWT cookie validator
-    │   │   └── upload.ts           # Multer storage, size limits & MIME filter
-    │   ├── models/
-    │   │   ├── Document.ts         # Document schema (IDocument)
-    │   │   └── User.ts             # User schema (IUser)
-    │   ├── routes/
-    │   │   ├── authRoutes.ts       # /api/auth routes
-    │   │   ├── documentRoutes.ts   # /api/documents routes (protected)
-    │   │   └── userRoutes.ts       # /api/users routes
-    │   ├── services/
-    │   │   ├── documentProcessor.ts# Background extraction & embedding orchestrator
-    │   │   ├── chunking/           # Token-aware recursive text splitting
-    │   │   │   ├── ChunkingService.ts
-    │   │   │   └── index.ts
-    │   │   ├── embeddings/         # Vector embeddings & local fallback
-    │   │   │   ├── IEmbeddingService.ts
-    │   │   │   ├── OpenAIEmbeddingService.ts
-    │   │   │   ├── HuggingFaceEmbeddingService.ts
-    │   │   │   ├── EmbeddingFactory.ts
-    │   │   │   ├── vectorMath.ts
-    │   │   │   └── index.ts
-    │   │   ├── parsers/            # Multi-format document parser strategies
-    │   │   │   ├── BaseParser.ts
-    │   │   │   ├── ParserFactory.ts
-    │   │   │   ├── SmartPdfParser.ts
-    │   │   │   ├── MarkdownDocxParser.ts
-    │   │   │   ├── TabularDataParser.ts
-    │   │   │   ├── JsonDataParser.ts
-    │   │   │   └── PlainTextParser.ts
-    │   │   └── storage/            # Cloud & local storage abstraction
-    │   │       ├── IStorageService.ts
-    │   │       ├── S3StorageService.ts
-    │   │       ├── LocalStorageService.ts
-    │   │       └── StorageFactory.ts
-    │   ├── scripts/
-    │   │   └── test-embeddings.ts  # Verification runner for chunking & embeddings
-    │   ├── types/
-    │   │   └── express.d.ts        # Request augmentation (req.user)
-    │   └── server.ts               # Express entry point
+    ├── config/
+    │   ├── db.ts               # MongoDB Mongoose connection
+    │   └── firebaseAdmin.ts    # Firebase Admin SDK initialization
+    ├── controllers/
+    │   ├── authController.ts   # Signup, signin, Google OAuth, forgot/reset password
+    │   ├── documentController.ts# Upload, list, get, view URLs, delete
+    │   └── userController.ts   # User management handlers
+    ├── middleware/
+    │   ├── auth.ts             # verifyToken JWT cookie validator
+    │   └── upload.ts           # Multer storage, size limits & MIME filter
+    ├── models/
+    │   ├── Document.ts         # Document schema (IDocument)
+    │   └── User.ts             # User schema (IUser with reset token fields)
+    ├── routes/
+    │   ├── authRoutes.ts       # /api/auth routes (signup, signin, reset)
+    │   ├── documentRoutes.ts   # /api/documents routes (protected)
+    │   └── userRoutes.ts       # /api/users routes
+    ├── services/
+    │   ├── documentProcessor.ts# Background extraction & embedding orchestrator
+    │   ├── chunking/           # Token-aware recursive text splitting
+    │   │   ├── ChunkingService.ts
+    │   │   └── index.ts
+    │   ├── email/              # SMTP dispatcher & dev console fallback
+    │   │   ├── EmailService.ts
+    │   │   └── index.ts
+    │   ├── embeddings/         # Vector embeddings & local fallback
+    │   │   ├── IEmbeddingService.ts
+    │   │   ├── OpenAIEmbeddingService.ts
+    │   │   ├── HuggingFaceEmbeddingService.ts
+    │   │   ├── EmbeddingFactory.ts
+    │   │   ├── vectorMath.ts
+    │   │   └── index.ts
+    │   ├── parsers/            # Multi-format document parser strategies
+    │   │   ├── BaseParser.ts
+    │   │   ├── ParserFactory.ts
+    │   │   ├── SmartPdfParser.ts
+    │   │   ├── MarkdownDocxParser.ts
+    │   │   ├── TabularDataParser.ts
+    │   │   ├── JsonDataParser.ts
+    │   │   └── PlainTextParser.ts
+    │   └── storage/            # Cloud & local storage abstraction
+    │       ├── IStorageService.ts
+    │       ├── S3StorageService.ts
+    │       ├── LocalStorageService.ts
+    │       └── StorageFactory.ts
+    ├── scripts/
+    │   ├── test-embeddings.ts  # Verification runner for chunking & embeddings
+    │   └── test-password-reset.ts # Verification runner for password reset flow
+    ├── types/
+    │   └── express.d.ts        # Request augmentation (req.user)
+    └── server.ts               # Express entry point
     ├── uploads/                    # Local storage directory (git-ignored)
     │   └── .gitkeep
     ├── .env.example
@@ -227,6 +234,18 @@ OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 # Optional: Matryoshka Representation Learning dimension reduction (e.g. 512, 1536)
 OPENAI_EMBEDDING_DIMENSIONS=1536
+
+# ChromaDB Vector Database & Grounded Q&A (Stage 5)
+CHROMA_URL=http://localhost:8000
+OPENAI_CHAT_MODEL=gpt-4o-mini
+
+# Email Service (Password Reset - Optional; defaults to terminal console in development)
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM="DevDocs AI" <noreply@devdocs.ai>
+SMTP_SECURE=false
 ```
 
 Start the backend in development mode:
@@ -303,12 +322,15 @@ npm run test:embeddings
 | `POST` | `/api/auth/signin` | No | Authenticate user and receive HTTP-only JWT cookie |
 | `POST` | `/api/auth/google` | No | Verify Firebase Google ID token and issue JWT session |
 | `POST` | `/api/auth/signout`| Yes | Clears session cookie |
+| `POST` | `/api/auth/forgot-password` | No | Request 15-minute password reset link via email (anti-enumeration) |
+| `POST` | `/api/auth/reset-password` | No | Complete password reset using SHA-256 verified token |
 | `POST` | `/api/documents/upload` | **Yes** | Upload document (`multipart/form-data`) up to 20MB to S3 or local disk |
 | `GET` | `/api/documents` | **Yes** | Fetch all documents uploaded by authenticated user |
 | `GET` | `/api/documents/:id` | **Yes** | Fetch single document metadata and extracted content (user-scoped) |
+| `POST`| `/api/documents/:id/chat` | **Yes** | Ask grounded questions against indexed document with citations |
 | `GET` | `/api/documents/:id/download-url` | **Yes** | Generate time-limited presigned S3 URL or local streaming link |
 | `GET` | `/api/documents/:id/file` | **Yes** | Stream document binary directly with appropriate MIME headers |
-| `DELETE`| `/api/documents/:id` | **Yes** | Delete document from MongoDB and physical storage (S3 or local) |
+| `DELETE`| `/api/documents/:id` | **Yes** | Delete document from MongoDB, storage (S3/local), and ChromaDB vectors |
 
 ---
 
