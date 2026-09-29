@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import { getAuth } from "../config/firebaseAdmin.js";
 import crypto from "crypto";
 import dotenv from "dotenv";
+import { EmailService } from "../services/email/index.js";
 
 dotenv.config();
 
@@ -201,3 +202,113 @@ export async function signout(_req: Request, res: Response): Promise<Response> {
     return res.status(500).json({ error: err.message });
   }
 }
+
+/**
+ * Initiates the password reset process.
+ * Generates an unguessable 256-bit token, saves its SHA-256 hash in MongoDB,
+ * and sends an email with the unhashed reset link.
+ */
+export async function forgotPassword(req: Request, res: Response): Promise<Response> {
+  try {
+    const { email } = req.body;
+
+    if (!email || typeof email !== "string" || !/\S+@\S+\.\S+/.test(email)) {
+      return res.status(400).json({ error: "A valid email address is required" });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail });
+
+    let devResetUrl: string | undefined;
+
+    // Security: Only proceed if user exists and has a standard password (not OAuth-only)
+    if (user && user.password) {
+      // 1. Generate 32-byte cryptographically secure random token (64 hex characters)
+      const rawToken = crypto.randomBytes(32).toString("hex");
+
+      // 2. Hash token using SHA-256 for secure database storage
+      const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+      // 3. Save hashed token and 15-minute expiration
+      user.resetPasswordToken = hashedToken;
+      user.resetPasswordExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+      await user.save();
+
+      // 4. Construct reset link URL
+      const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+      const resetUrl = `${clientUrl}/reset-password/${rawToken}`;
+
+      // 5. Dispatch email
+      const emailResult = await EmailService.sendPasswordResetEmail(
+        user.email,
+        resetUrl,
+        user.name
+      );
+      devResetUrl = emailResult.devResetUrl;
+    } else if (user && !user.password) {
+      console.warn(`[ForgotPassword] Password reset requested for Google OAuth account: ${normalizedEmail}`);
+    }
+
+    // OWASP: Always return a generic success message to prevent user enumeration
+    return res.status(200).json({
+      message: "If an account with that email exists, a password reset link has been sent.",
+      devResetUrl, // Returned in dev mode for quick local testing
+    });
+  } catch (err: any) {
+    console.error("[ForgotPassword] Error:", err.message);
+    return res.status(500).json({ error: "Failed to process password reset request" });
+  }
+}
+
+/**
+ * Completes the password reset process.
+ * Validates the unexpired token hash and updates the password with bcrypt.
+ */
+export async function resetPassword(req: Request, res: Response): Promise<Response> {
+  try {
+    const token = req.body.token || req.params.token;
+    const { password } = req.body;
+
+    if (!token || typeof token !== "string") {
+      return res.status(400).json({ error: "Password reset token is required" });
+    }
+
+    if (!password || typeof password !== "string" || password.length < 6) {
+      return res.status(400).json({ error: "Password must be at least 6 characters long" });
+    }
+
+    // 1. Hash the incoming token using SHA-256 to look up in the database
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    // 2. Find user with matching active token that has not expired
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        error: "Password reset link is invalid or has expired. Please request a new link.",
+      });
+    }
+
+    // 3. Hash the new password using bcryptjs
+    const salt = await bcryptjs.genSalt(10);
+    user.password = await bcryptjs.hash(password, salt);
+
+    // 4. Invalidate the reset token atomically
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+
+    console.log(`[ResetPassword] Successfully updated password for user: ${user.email}`);
+
+    return res.status(200).json({
+      message: "Password has been successfully updated. You may now sign in with your new password.",
+    });
+  } catch (err: any) {
+    console.error("[ResetPassword] Error:", err.message);
+    return res.status(500).json({ error: "Failed to reset password" });
+  }
+}
+

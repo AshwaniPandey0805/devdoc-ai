@@ -3,6 +3,8 @@ import { Routes, Route } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Header from "./components/Header";
 import { PrivateRoute, PublicOnlyRoute } from "./components/AuthGuard";
 
@@ -20,6 +22,8 @@ export default function App(): React.ReactElement {
         <Route element={<PublicOnlyRoute />}>
           <Route path="/sign-in" element={<SignIn />} />
           <Route path="/sign-up" element={<SignUp />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
         </Route>
       </Routes>
     </div>

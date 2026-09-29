@@ -91,9 +91,17 @@ export default function SignIn(): React.ReactElement {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">
-              Password
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Password
+              </label>
+              <Link
+                to="/forgot-password"
+                className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <input
               type="password"
               id="password"
